@@ -1,0 +1,15 @@
+{
+  "presetQQ": ["869760112", "3324544625", "2325086810"],
+  "daodao": {
+    "baseUrl": "https://www.hnlsxxkj.com",
+    "skuId": 1074,
+    "cookie": "",
+    "xsrfToken": ""
+  },
+  "niuniu": {
+    "baseUrl": "https://www.whquxinyong.xyz",
+    "skuId": 1071,
+    "cookie": "",
+    "xsrfToken": ""
+  }
+}

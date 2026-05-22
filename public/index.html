@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>叨叨 / 牛牛充值</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      color: #e8e8e8;
+      padding: 2rem 1rem;
+    }
+    .container { max-width: 560px; margin: 0 auto; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.25rem; }
+    .tab-btn {
+      flex: 1 1 46%;
+      padding: 0.6rem 0.4rem;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 10px;
+      background: rgba(0,0,0,0.2);
+      color: #8892b0;
+      cursor: pointer;
+      font-size: 0.82rem;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      background: rgba(0,217,255,0.15);
+      border-color: #00d9ff;
+      color: #00d9ff;
+    }
+    .tab-btn.niuniu.active {
+      border-color: #ffb347;
+      color: #ffb347;
+      background: rgba(255,179,71,0.12);
+    }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    h1 {
+      text-align: center;
+      font-size: 1.75rem;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(90deg, #00d9ff, #00ff88);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle { text-align: center; color: #8892b0; font-size: 0.9rem; margin-bottom: 2rem; }
+    .card {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+      backdrop-filter: blur(10px);
+    }
+    label { display: block; font-size: 0.85rem; color: #8892b0; margin-bottom: 0.5rem; }
+    .qq-presets { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .qq-btn {
+      padding: 0.5rem 1rem;
+      border: 1px solid rgba(0,217,255,0.4);
+      border-radius: 8px;
+      background: rgba(0,217,255,0.1);
+      color: #00d9ff;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .panel-niuniu .qq-btn {
+      border-color: rgba(255,179,71,0.5);
+      color: #ffb347;
+      background: rgba(255,179,71,0.1);
+    }
+    .qq-btn:hover, .qq-btn.active { filter: brightness(1.2); }
+    textarea, input[type="text"], input[type="number"] {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 10px;
+      background: rgba(0,0,0,0.25);
+      color: #fff;
+      margin-bottom: 1rem;
+    }
+    textarea {
+      font-size: 0.8rem;
+      font-family: Consolas, Monaco, monospace;
+      min-height: 100px;
+      resize: vertical;
+    }
+    input[type="number"] { font-size: 1rem; }
+    textarea:focus, input:focus { outline: none; border-color: #00d9ff; }
+    .panel-niuniu textarea:focus, .panel-niuniu input:focus { border-color: #ffb347; }
+    .buy-btn {
+      width: 100%;
+      padding: 1rem;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(90deg, #00d9ff, #00ff88);
+      color: #1a1a2e;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .panel-niuniu .buy-btn {
+      background: linear-gradient(90deg, #ffb347, #ffcc66);
+    }
+    .buy-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-row { display: flex; gap: 0.5rem; }
+    .btn-row button { flex: 1; }
+    .secondary-btn {
+      padding: 0.75rem 1rem;
+      border: 1px solid rgba(0,217,255,0.4);
+      border-radius: 10px;
+      background: rgba(0,217,255,0.08);
+      color: #00d9ff;
+      cursor: pointer;
+    }
+    .panel-niuniu .secondary-btn {
+      border-color: rgba(255,179,71,0.5);
+      color: #ffb347;
+      background: rgba(255,179,71,0.08);
+    }
+    .status-badge {
+      font-size: 0.8rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      background: rgba(0,0,0,0.25);
+      color: #8892b0;
+    }
+    .status-badge.ok { color: #00ff88; border: 1px solid rgba(0,255,136,0.3); }
+    .status-badge.err { color: #ff6b6b; border: 1px solid rgba(255,107,107,0.3); }
+    .order-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      min-height: 2rem;
+      margin-bottom: 0.25rem;
+    }
+    .order-empty { color: #6c7a89; font-size: 0.85rem; }
+    .order-link {
+      display: block;
+      padding: 0.65rem 0.75rem;
+      border-radius: 8px;
+      background: rgba(0,217,255,0.1);
+      border: 1px solid rgba(0,217,255,0.35);
+      color: #00d9ff;
+      text-decoration: none;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 0.95rem;
+      word-break: break-all;
+    }
+    .panel-niuniu .order-link {
+      color: #ffb347;
+      border-color: rgba(255,179,71,0.4);
+      background: rgba(255,179,71,0.1);
+    }
+    .order-link.clicked {
+      color: #5a6a7a !important;
+      border-color: rgba(90,106,122,0.5) !important;
+      background: rgba(90,106,122,0.15) !important;
+      opacity: 0.85;
+    }
+    .panel-niuniu .order-link.clicked {
+      color: #7a6b55 !important;
+      border-color: rgba(122,107,85,0.5) !important;
+      background: rgba(122,107,85,0.15) !important;
+    }
+    .log-box {
+      background: rgba(0,0,0,0.35);
+      border-radius: 10px;
+      padding: 1rem;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 0.8rem;
+      line-height: 1.6;
+      max-height: 220px;
+      overflow-y: auto;
+      word-break: break-all;
+      color: #a8b2d1;
+    }
+    .log-box .success { color: #00ff88; }
+    .log-box .error { color: #ff6b6b; }
+    .hint { font-size: 0.75rem; color: #6c7a89; margin-top: 0.75rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>叨叨 / 牛牛充值</h1>
+    <p class="subtitle">双平台独立 Cookie · 点击订单号跳转支付</p>
+
+    <div class="tabs">
+      <button type="button" class="tab-btn active" data-panel="panel-daodao-recharge">叨叨充值</button>
+      <button type="button" class="tab-btn" data-panel="panel-daodao-settings">叨叨cookie配置</button>
+      <button type="button" class="tab-btn niuniu" data-panel="panel-niuniu-recharge">牛牛充值</button>
+      <button type="button" class="tab-btn niuniu" data-panel="panel-niuniu-settings">牛牛cookie配置</button>
+    </div>
+
+    <!-- 叨叨充值 -->
+    <div id="panel-daodao-recharge" class="panel active" data-shop="daodao">
+      <div class="card">
+        <label>选择 QQ 号</label>
+        <div class="qq-presets" data-qq-presets></div>
+        <label>或手动输入 QQ</label>
+        <input type="text" data-qq-input placeholder="请输入 QQ 号" maxlength="15" />
+        <label>购买数量（连续下单次数）</label>
+        <input type="number" data-quantity value="1" min="1" max="20" />
+        <button type="button" class="buy-btn" data-buy-btn>立即购买</button>
+        <p class="hint">叨叨商城 hnlsxxkj.com · 数量为 N 连续购买 N 次</p>
+      </div>
+      <div class="card">
+        <label>获取到的订单号（点击跳转支付，已点击变灰）</label>
+        <div class="order-list" data-order-list><span class="order-empty">暂无订单</span></div>
+        <label style="margin-top:1rem">运行日志</label>
+        <div class="log-box" data-log-box>等待操作…</div>
+      </div>
+    </div>
+
+    <!-- 叨叨 Cookie -->
+    <div id="panel-daodao-settings" class="panel" data-shop="daodao">
+      <div class="card">
+        <label>叨叨当前配置</label>
+        <div class="status-badge" data-config-status>加载中…</div>
+        <label>Cookie</label>
+        <textarea data-cookie-input placeholder="XSRF-TOKEN=...; beikeshop_session=..."></textarea>
+        <label>X-XSRF-TOKEN（可选）</label>
+        <input type="text" data-xsrf-input placeholder="留空则从 Cookie 解析" />
+        <div class="btn-row" style="margin-bottom:0.5rem">
+          <button type="button" class="secondary-btn" data-paste-btn>从剪贴板填入</button>
+          <button type="button" class="secondary-btn" data-parse-btn>解析已粘贴内容</button>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="secondary-btn" data-test-btn>测试连接</button>
+          <button type="button" class="buy-btn" data-save-btn style="padding:0.75rem">保存配置</button>
+        </div>
+        <p class="hint">登录后 F12 复制 Cookie，点「从剪贴板填入」可自动填 Cookie 和 XSRF</p>
+      </div>
+      <div class="card">
+        <label>配置日志</label>
+        <div class="log-box" data-settings-log>等待操作…</div>
+      </div>
+    </div>
+
+    <!-- 牛牛充值 -->
+    <div id="panel-niuniu-recharge" class="panel panel-niuniu" data-shop="niuniu">
+      <div class="card">
+        <label>选择 QQ 号</label>
+        <div class="qq-presets" data-qq-presets></div>
+        <label>或手动输入 QQ</label>
+        <input type="text" data-qq-input placeholder="请输入 QQ 号" maxlength="15" />
+        <label>购买数量（连续下单次数）</label>
+        <input type="number" data-quantity value="1" min="1" max="20" />
+        <button type="button" class="buy-btn" data-buy-btn>立即购买</button>
+        <p class="hint">牛牛商城 whquxinyong.xyz · 数量为 N 连续购买 N 次</p>
+      </div>
+      <div class="card">
+        <label>获取到的订单号（点击跳转支付，已点击变灰）</label>
+        <div class="order-list" data-order-list><span class="order-empty">暂无订单</span></div>
+        <label style="margin-top:1rem">运行日志</label>
+        <div class="log-box" data-log-box>等待操作…</div>
+      </div>
+    </div>
+
+    <!-- 牛牛 Cookie -->
+    <div id="panel-niuniu-settings" class="panel panel-niuniu" data-shop="niuniu">
+      <div class="card">
+        <label>牛牛当前配置</label>
+        <div class="status-badge" data-config-status>加载中…</div>
+        <label>Cookie</label>
+        <textarea data-cookie-input placeholder="XSRF-TOKEN=...; _session=..."></textarea>
+        <label>X-XSRF-TOKEN（可选）</label>
+        <input type="text" data-xsrf-input placeholder="留空则从 Cookie 解析" />
+        <div class="btn-row" style="margin-bottom:0.5rem">
+          <button type="button" class="secondary-btn" data-paste-btn>从剪贴板填入</button>
+          <button type="button" class="secondary-btn" data-parse-btn>解析已粘贴内容</button>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="secondary-btn" data-test-btn>测试连接</button>
+          <button type="button" class="buy-btn" data-save-btn style="padding:0.75rem">保存配置</button>
+        </div>
+        <p class="hint">打开本页会自动加载已保存 Cookie；也可 F12 复制后点「从剪贴板填入」</p>
+      </div>
+      <div class="card">
+        <label>配置日志</label>
+        <div class="log-box" data-settings-log>等待操作…</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SHOP_BASE = {
+      daodao: 'https://www.hnlsxxkj.com',
+      niuniu: 'https://www.whquxinyong.xyz',
+    };
+
+    function sleep(ms) {
+      return new Promise((r) => setTimeout(r, ms));
+    }
+
+    function buildPaymentUrl(shop, orderNumber) {
+      return `${SHOP_BASE[shop]}/orders/${orderNumber}/NiupayPay?type=create`;
+    }
+
+    function parseXsrfFromCookie(cookie) {
+      const m = cookie.match(/XSRF-TOKEN=([^;]+)/);
+      if (!m) return '';
+      try { return decodeURIComponent(m[1].trim()); } catch { return m[1].trim(); }
+    }
+
+    function parseCookieBlock(text) {
+      let cookie = '';
+      let xsrf = '';
+      const t = (text || '').trim();
+      if (!t) return { cookie, xsrf };
+
+      const cookieLine = t.match(/Cookie:\s*([^\r\n]+)/i);
+      const xsrfLine = t.match(/X-XSRF-TOKEN:\s*([^\r\n]+)/i);
+      if (cookieLine) cookie = cookieLine[1].trim();
+      else if (t.includes('XSRF-TOKEN=') || t.includes('_session=')) {
+        cookie = t.replace(/\s+/g, ' ').split(/\r?\n/)[0].trim();
+      }
+      if (xsrfLine) xsrf = xsrfLine[1].trim();
+      if (!xsrf && cookie) xsrf = parseXsrfFromCookie(cookie);
+      return { cookie, xsrf };
+    }
+
+    function applyCookieFields(cookieInput, xsrfInput, text, settingsLog) {
+      const { cookie, xsrf } = parseCookieBlock(text);
+      if (!cookie) {
+        if (settingsLog) appendLog(settingsLog, '未识别到 Cookie，请粘贴完整 Cookie 或抓包文本', 'error');
+        return false;
+      }
+      cookieInput.value = cookie;
+      if (xsrf) xsrfInput.value = xsrf;
+      if (settingsLog) appendLog(settingsLog, '已自动填入 Cookie' + (xsrf ? ' 和 XSRF' : ''), 'success');
+      return true;
+    }
+
+    async function pasteFromClipboard(cookieInput, xsrfInput, settingsLog) {
+      try {
+        const text = await navigator.clipboard.readText();
+        return applyCookieFields(cookieInput, xsrfInput, text, settingsLog);
+      } catch (e) {
+        if (settingsLog) appendLog(settingsLog, '无法读取剪贴板，请手动 Ctrl+V 粘贴到 Cookie 框', 'error');
+        return false;
+      }
+    }
+
+    function getPanel(shop, type) {
+      return document.getElementById(`panel-${shop}-${type}`);
+    }
+
+    function q(panel, sel) {
+      return panel.querySelector(sel);
+    }
+
+    function appendLog(logBox, text, cls = '') {
+      const span = document.createElement('div');
+      if (cls) span.className = cls;
+      span.textContent = `[${new Date().toLocaleTimeString('zh-CN')}] ${text}`;
+      logBox.appendChild(span);
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    function clearOrderList(orderList) {
+      orderList.innerHTML = '<span class="order-empty">暂无订单</span>';
+    }
+
+    function collectOrders(data, shop) {
+      const list = [];
+      const seen = new Set();
+      const add = (orderNumber, paymentUrl) => {
+        if (!orderNumber || seen.has(orderNumber)) return;
+        seen.add(orderNumber);
+        list.push({ orderNumber, paymentUrl: paymentUrl || buildPaymentUrl(shop, orderNumber) });
+      };
+      (data.orders || []).forEach((o) => add(o.orderNumber, o.paymentUrl));
+      if (data.orderNumber) add(data.orderNumber, data.paymentUrl);
+      (data.logs || []).forEach((item) => {
+        const m = item.message || '';
+        const match = m.match(/订单号[：:]\s*(qb\w+)/i);
+        if (match) add(match[1]);
+      });
+      return list;
+    }
+
+    function clickedOrdersKey(shop) {
+      return `clicked_orders_${shop}`;
+    }
+
+    function getClickedOrders(shop) {
+      try {
+        return JSON.parse(localStorage.getItem(clickedOrdersKey(shop)) || '[]');
+      } catch {
+        return [];
+      }
+    }
+
+    function markOrderClicked(shop, orderNumber) {
+      const list = getClickedOrders(shop);
+      if (!list.includes(orderNumber)) {
+        list.push(orderNumber);
+        localStorage.setItem(clickedOrdersKey(shop), JSON.stringify(list));
+      }
+    }
+
+    function renderOrders(orderList, orders, shop) {
+      const clicked = getClickedOrders(shop);
+      orderList.innerHTML = '';
+      if (!orders.length) {
+        orderList.innerHTML = '<span class="order-empty">暂无订单</span>';
+        return;
+      }
+      orders.forEach((o) => {
+        const link = document.createElement('a');
+        link.className = 'order-link';
+        if (clicked.includes(o.orderNumber)) link.classList.add('clicked');
+        link.href = o.paymentUrl;
+        link.textContent = o.orderNumber;
+        link.addEventListener('click', () => {
+          markOrderClicked(shop, o.orderNumber);
+          link.classList.add('clicked');
+        });
+        orderList.appendChild(link);
+      });
+    }
+
+    async function loadPresets() {
+      const res = await fetch('/api/config');
+      const data = await res.json();
+      ['daodao', 'niuniu'].forEach((shop) => {
+        const panel = getPanel(shop, 'recharge');
+        const presets = q(panel, '[data-qq-presets]');
+        const input = q(panel, '[data-qq-input]');
+        presets.innerHTML = '';
+        (data.presetQQ || []).forEach((qq) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'qq-btn';
+          btn.textContent = qq;
+          btn.onclick = () => {
+            input.value = qq;
+            presets.querySelectorAll('.qq-btn').forEach((b) => b.classList.remove('active'));
+            btn.classList.add('active');
+          };
+          presets.appendChild(btn);
+        });
+        if (data.presetQQ?.length) {
+          input.value = data.presetQQ[0];
+          presets.querySelector('.qq-btn')?.classList.add('active');
+        }
+      });
+    }
+
+    async function loadSettings(shop) {
+      const panel = getPanel(shop, 'settings');
+      const status = q(panel, '[data-config-status]');
+      const cookieInput = q(panel, '[data-cookie-input]');
+      const xsrfInput = q(panel, '[data-xsrf-input]');
+      try {
+        const res = await fetch(`/api/settings?shop=${shop}`);
+        if (!res.ok) {
+          status.textContent = `加载失败 (HTTP ${res.status})，请关闭旧窗口后重新运行 启动.bat`;
+          status.className = 'status-badge err';
+          return;
+        }
+        const data = await res.json();
+        cookieInput.value = data.cookie || '';
+        xsrfInput.value = data.xsrfToken || '';
+        status.textContent = `Cookie: ${data.cookiePreview} | XSRF: ${data.xsrfPreview}`;
+        status.className = 'status-badge' + (data.cookie ? ' ok' : '');
+      } catch (e) {
+        status.textContent = `加载失败：${e.message}。请先运行 启动.bat 再打开 http://localhost:8765`;
+        status.className = 'status-badge err';
+      }
+    }
+
+    function bindSettings(shop) {
+      const panel = getPanel(shop, 'settings');
+      const cookieInput = q(panel, '[data-cookie-input]');
+      const xsrfInput = q(panel, '[data-xsrf-input]');
+      const status = q(panel, '[data-config-status]');
+      const settingsLog = q(panel, '[data-settings-log]');
+
+      cookieInput.addEventListener('input', () => {
+        const p = parseXsrfFromCookie(cookieInput.value);
+        if (p && !xsrfInput.value.trim()) xsrfInput.value = p;
+      });
+
+      cookieInput.addEventListener('paste', (e) => {
+        setTimeout(() => {
+          applyCookieFields(cookieInput, xsrfInput, cookieInput.value, settingsLog);
+        }, 0);
+      });
+
+      q(panel, '[data-paste-btn]')?.addEventListener('click', () => {
+        pasteFromClipboard(cookieInput, xsrfInput, settingsLog);
+      });
+
+      q(panel, '[data-parse-btn]')?.addEventListener('click', () => {
+        applyCookieFields(cookieInput, xsrfInput, cookieInput.value, settingsLog);
+      });
+
+      q(panel, '[data-test-btn]').addEventListener('click', async () => {
+        const cookie = cookieInput.value.trim();
+        let xsrf = xsrfInput.value.trim();
+        if (!xsrf && cookie) xsrf = parseXsrfFromCookie(cookie);
+        if (!cookie) {
+          appendLog(settingsLog, '请填写 Cookie', 'error');
+          return;
+        }
+        try {
+          const res = await fetch('/api/settings/test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ shop, cookie, xsrfToken: xsrf }),
+          });
+          const data = await res.json();
+          appendLog(settingsLog, data.message, data.ok ? 'success' : 'error');
+          status.textContent = data.message;
+          status.className = 'status-badge ' + (data.ok ? 'ok' : 'err');
+        } catch (e) {
+          appendLog(settingsLog, e.message, 'error');
+        }
+      });
+
+      q(panel, '[data-save-btn]').addEventListener('click', async () => {
+        const cookie = cookieInput.value.trim();
+        let xsrf = xsrfInput.value.trim();
+        if (!xsrf && cookie) xsrf = parseXsrfFromCookie(cookie);
+        if (!cookie) {
+          appendLog(settingsLog, 'Cookie 不能为空', 'error');
+          return;
+        }
+        try {
+          const res = await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ shop, cookie, xsrfToken: xsrf }),
+          });
+          const data = await res.json();
+          appendLog(settingsLog, data.message, data.ok ? 'success' : 'error');
+          if (data.ok) {
+            status.textContent = `已保存 | Cookie: ${data.cookiePreview}`;
+            status.className = 'status-badge ok';
+            if (!xsrfInput.value.trim()) xsrfInput.value = xsrf;
+          }
+        } catch (e) {
+          appendLog(settingsLog, e.message, 'error');
+        }
+      });
+    }
+
+    function bindRecharge(shop) {
+      const panel = getPanel(shop, 'recharge');
+      const buyBtn = q(panel, '[data-buy-btn]');
+      const logBox = q(panel, '[data-log-box]');
+      const orderList = q(panel, '[data-order-list]');
+      const qqInput = q(panel, '[data-qq-input]');
+      const quantityInput = q(panel, '[data-quantity]');
+
+      buyBtn.addEventListener('click', async () => {
+        const qq = qqInput.value.trim();
+        const quantity = parseInt(quantityInput.value, 10) || 1;
+        if (!qq) {
+          appendLog(logBox, '请填写 QQ 号', 'error');
+          return;
+        }
+
+        buyBtn.disabled = true;
+        logBox.innerHTML = '';
+        clearOrderList(orderList);
+        appendLog(logBox, `开始购买，将连续下单 ${quantity} 次…`);
+
+        const allOrders = [];
+        let hasError = false;
+
+        try {
+          for (let i = 1; i <= quantity; i++) {
+            appendLog(logBox, `—— 第 ${i}/${quantity} 次 ——`);
+            const res = await fetch('/api/purchase', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ shop, qq, quantity: 1 }),
+            });
+            const data = await res.json();
+
+            (data.logs || []).forEach((item) => {
+              const m = item.message || '';
+              let cls = '';
+              if (m.includes('成功') || m.includes('全部完成')) cls = 'success';
+              if (m.includes('失败') || m.includes('异常')) cls = 'error';
+              appendLog(logBox, m, cls);
+            });
+
+            collectOrders(data, shop).forEach((o) => {
+              if (!allOrders.some((x) => x.orderNumber === o.orderNumber)) {
+                allOrders.push(o);
+              }
+            });
+
+            if (!data.ok) {
+              hasError = true;
+              appendLog(logBox, data.message || `第 ${i} 次失败`, 'error');
+              break;
+            }
+            if (i < quantity) await sleep(800);
+          }
+
+          if (allOrders.length) {
+            renderOrders(orderList, allOrders, shop);
+            appendLog(logBox, `共 ${allOrders.length} 个订单，点击订单号跳转支付`, 'success');
+          } else if (!hasError) {
+            orderList.innerHTML = '<span class="order-empty">未解析到订单号</span>';
+          }
+        } catch (e) {
+          appendLog(logBox, `网络错误: ${e.message}`, 'error');
+        } finally {
+          buyBtn.disabled = false;
+        }
+      });
+    }
+
+    document.querySelectorAll('.tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
+        btn.classList.add('active');
+        const panel = document.getElementById(btn.dataset.panel);
+        panel.classList.add('active');
+        const shop = panel.dataset.shop;
+        if (btn.dataset.panel.includes('settings')) {
+          loadSettings(shop).then(() => {
+            if (shop === 'niuniu') tryAutoClipboardFill(shop);
+          });
+        }
+      });
+    });
+
+    async function tryAutoClipboardFill(shop) {
+      const panel = getPanel(shop, 'settings');
+      const cookieInput = q(panel, '[data-cookie-input]');
+      const xsrfInput = q(panel, '[data-xsrf-input]');
+      const settingsLog = q(panel, '[data-settings-log]');
+      if (cookieInput.value.trim()) return;
+      const text = await navigator.clipboard.readText().catch(() => '');
+      if (text && (text.includes('whquxinyong') || text.includes('XSRF-TOKEN'))) {
+        if (shop === 'niuniu' && (text.includes('whquxinyong') || text.includes('_session='))) {
+          applyCookieFields(cookieInput, xsrfInput, text, settingsLog);
+        } else if (shop === 'daodao' && text.includes('hnlsxxkj')) {
+          applyCookieFields(cookieInput, xsrfInput, text, settingsLog);
+        }
+      }
+    }
+
+    ['daodao', 'niuniu'].forEach((shop) => {
+      bindRecharge(shop);
+      bindSettings(shop);
+    });
+
+    loadPresets();
+    loadSettings('daodao');
+    loadSettings('niuniu');
+  </script>
+</body>
+</html>

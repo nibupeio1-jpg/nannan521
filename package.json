@@ -1,0 +1,12 @@
+{
+  "name": "qb-recharge",
+  "version": "1.0.0",
+  "description": "Q币充值网站",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

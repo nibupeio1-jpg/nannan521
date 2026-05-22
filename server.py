@@ -123,6 +123,102 @@ def parse_xsrf_from_cookie(cookie: str):
     return unquote(m.group(1).strip())
 
 
+def parse_cookie_string(cookie_str: str) -> dict:
+    cookies = {}
+    for part in (cookie_str or "").split(";"):
+        part = part.strip()
+        if "=" in part:
+            key, val = part.split("=", 1)
+            cookies[key.strip()] = val.strip()
+    return cookies
+
+
+def cookies_to_string(cookies: dict) -> str:
+    return "; ".join(f"{k}={v}" for k, v in cookies.items())
+
+
+def merge_set_cookie_headers(cookies: dict, headers) -> dict:
+    from http.cookies import SimpleCookie
+
+    if hasattr(headers, "get_all"):
+        set_cookies = headers.get_all("Set-Cookie") or []
+    else:
+        one = headers.get("Set-Cookie")
+        set_cookies = [one] if one else []
+    for header in set_cookies:
+        if not header:
+            continue
+        sc = SimpleCookie()
+        sc.load(header)
+        for key, morsel in sc.items():
+            cookies[key] = morsel.value
+    return cookies
+
+
+class ShopSession:
+    """同一订单流程内自动合并 Set-Cookie，避免 CSRF token mismatch。"""
+
+    def __init__(self, config: dict):
+        self.base_url = config["baseUrl"]
+        self.cookies = parse_cookie_string(config.get("cookie", ""))
+        xsrf = config.get("xsrfToken") or ""
+        if xsrf and "XSRF-TOKEN" not in self.cookies:
+            self.cookies["XSRF-TOKEN"] = xsrf
+        self._sync_xsrf_header()
+
+    def _sync_xsrf_header(self):
+        cookie_str = cookies_to_string(self.cookies)
+        self.xsrf = parse_xsrf_from_cookie(cookie_str) or ""
+
+    def cookie_string(self) -> str:
+        return cookies_to_string(self.cookies)
+
+    def build_headers(self, with_json=False) -> dict:
+        headers = {
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "zh-CN,zh;q=0.9",
+            "Connection": "keep-alive",
+            "Cookie": self.cookie_string(),
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
+            ),
+            "Origin": self.base_url,
+            "Referer": f"{self.base_url}/products/197",
+        }
+        if self.xsrf:
+            headers["X-XSRF-TOKEN"] = self.xsrf
+        if with_json:
+            headers["Content-Type"] = "application/json"
+        return headers
+
+    def request(self, path: str, method="GET", body=None):
+        url = f"{self.base_url}{path}"
+        data = None
+        if body is not None:
+            data = json.dumps(body).encode("utf-8")
+        req = urllib.request.Request(
+            url, data=data, headers=self.build_headers(body is not None), method=method
+        )
+        try:
+            resp = urllib.request.urlopen(req, timeout=30)
+            merge_set_cookie_headers(self.cookies, resp.headers)
+            self._sync_xsrf_header()
+            text = resp.read().decode("utf-8")
+            try:
+                return resp.status, json.loads(text)
+            except json.JSONDecodeError:
+                return resp.status, {"raw": text}
+        except urllib.error.HTTPError as e:
+            merge_set_cookie_headers(self.cookies, e.headers)
+            self._sync_xsrf_header()
+            text = e.read().decode("utf-8", errors="replace")
+            try:
+                return e.code, json.loads(text)
+            except json.JSONDecodeError:
+                return e.code, {"raw": text, "error": str(e)}
+
+
 def write_log(message: str):
     line = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}\n"
     with open(LOG_PATH, "a", encoding="utf-8") as f:
@@ -130,43 +226,9 @@ def write_log(message: str):
     print(message)
 
 
-def build_headers(config, with_json=False):
-    headers = {
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "zh-CN,zh;q=0.9",
-        "Connection": "keep-alive",
-        "Cookie": config["cookie"],
-        "X-XSRF-TOKEN": config["xsrfToken"],
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
-        ),
-        "Origin": config["baseUrl"],
-        "Referer": f"{config['baseUrl']}/products/197",
-    }
-    if with_json:
-        headers["Content-Type"] = "application/json"
-    return headers
-
-
-def http_request(url, method="GET", headers=None, body=None):
-    data = None
-    if body is not None:
-        data = json.dumps(body).encode("utf-8")
-    req = urllib.request.Request(url, data=data, headers=headers or {}, method=method)
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            text = resp.read().decode("utf-8")
-            try:
-                return resp.status, json.loads(text)
-            except json.JSONDecodeError:
-                return resp.status, {"raw": text}
-    except urllib.error.HTTPError as e:
-        text = e.read().decode("utf-8", errors="replace")
-        try:
-            return e.code, json.loads(text)
-        except json.JSONDecodeError:
-            return e.code, {"raw": text, "error": str(e)}
+def http_request_with_config(config, path, method="GET", body=None):
+    session = ShopSession(config)
+    return session.request(path, method, body)
 
 
 def create_single_order(config, qq: str, logs: list, index: int, total: int):
@@ -179,31 +241,33 @@ def create_single_order(config, qq: str, logs: list, index: int, total: int):
 
     add_log(f"正在创建第 {index}/{total} 个订单…")
 
-    status, _ = http_request(
-        f"{config['baseUrl']}/carts/mini",
-        "GET",
-        build_headers(config),
-    )
-    add_log(f"第 {index} 个：GET /carts/mini 完成，HTTP {status}")
+    session = ShopSession(config)
+    status, _ = session.request("/carts/mini", "GET")
+    add_log(f"第 {index} 个：GET /carts/mini 完成，HTTP {status}（已刷新 CSRF）")
 
-    status, cart_data = http_request(
-        f"{config['baseUrl']}/carts",
+    status, cart_data = session.request(
+        "/carts",
         "POST",
-        build_headers(config, True),
         {"sku_id": config["skuId"], "quantity": 1, "buy_now": True},
     )
 
     if cart_data.get("status") != "success":
-        msg = f"第 {index} 个订单加购失败: {json.dumps(cart_data, ensure_ascii=False)}"
+        err = cart_data.get("message", "")
+        if "CSRF" in str(cart_data) or "CSRF" in err:
+            msg = (
+                f"第 {index} 个订单加购失败: CSRF 校验失败。"
+                "请到「{0}cookie配置」用浏览器刚登录后的 Cookie 重新保存（GET 与 POST 须同一套）"
+            ).format(config["name"])
+        else:
+            msg = f"第 {index} 个订单加购失败: {json.dumps(cart_data, ensure_ascii=False)}"
         add_log(msg)
         return None, msg
 
     add_log(f"第 {index} 个：加入购物车成功")
 
-    status, confirm_data = http_request(
-        f"{config['baseUrl']}/checkout/confirm",
+    status, confirm_data = session.request(
+        "/checkout/confirm",
         "POST",
-        build_headers(config, True),
         {"comment": "", "qq": str(qq)},
     )
 
@@ -215,6 +279,13 @@ def create_single_order(config, qq: str, logs: list, index: int, total: int):
 
     payment_url = build_payment_url(config, order_number)
     add_log(f"第 {index} 个订单号: {order_number}")
+    try:
+        save_shop_config(
+            config["shop"],
+            {"cookie": session.cookie_string(), "xsrfToken": session.xsrf},
+        )
+    except Exception:
+        pass
     return {
         "index": index,
         "orderNumber": order_number,
@@ -373,15 +444,16 @@ class Handler(SimpleHTTPRequestHandler):
                 self._json_response({"ok": False, "message": "缺少 XSRF Token"}, 400)
                 return
             try:
-                status, data = http_request(
-                    f"{test_cfg['baseUrl']}/carts/mini",
-                    "GET",
-                    build_headers(test_cfg),
-                )
+                status, data = http_request_with_config(test_cfg, "/carts/mini", "GET")
                 ok = status == 200
+                csrf_ok = "CSRF" not in str(data)
                 self._json_response({
-                    "ok": ok,
-                    "message": f"{test_cfg['name']} Cookie 有效" if ok else f"HTTP {status}",
+                    "ok": ok and csrf_ok,
+                    "message": (
+                        f"{test_cfg['name']} Cookie 有效"
+                        if ok and csrf_ok
+                        else f"HTTP {status} 或 CSRF 无效，请重新复制 Cookie"
+                    ),
                     "status": status,
                     "data": data,
                 })

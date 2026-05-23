@@ -23,7 +23,7 @@ def normalize_config(cfg: dict) -> dict:
     if "daodao" in cfg and "niuniu" in cfg:
         return cfg
     preset = cfg.get(
-        "presetQQ", ["869760112", "3324544625", "2325086810"]
+        "presetQQ", ["869760112", "3324544625", "2325086810", "1511694038"]
     )
     return {
         "presetQQ": preset,
@@ -51,7 +51,7 @@ def load_config():
             CONFIG_PATH.write_text(
                 json.dumps(
                     {
-                        "presetQQ": ["869760112", "3324544625", "2325086810"],
+                        "presetQQ": ["869760112", "3324544625", "2325086810", "1511694038"],
                         "daodao": {
                             "baseUrl": SHOPS["daodao"]["baseUrl"],
                             "skuId": SHOPS["daodao"]["skuId"],

@@ -14,7 +14,7 @@ LOG_PATH = BASE_DIR / "purchase.log"
 PUBLIC_DIR = BASE_DIR / "public"
 
 SHOPS = {
-    "daodao": {"name": "叨叨", "baseUrl": "https://www.hnlsxxkj.com", "skuId": 1074},
+    "daodao": {"name": "叨叨", "baseUrl": "https://www.hnlsxxkj.com", "skuId": 1085},
     "niuniu": {"name": "牛牛", "baseUrl": "https://www.whquxinyong.xyz", "skuId": 1071},
 }
 

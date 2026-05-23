@@ -140,7 +140,10 @@
     }
     .order-empty { color: #6c7a89; font-size: 0.85rem; }
     .order-link {
-      display: block;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
       padding: 0.65rem 0.75rem;
       border-radius: 8px;
       background: rgba(0,217,255,0.1);
@@ -150,6 +153,20 @@
       font-family: Consolas, Monaco, monospace;
       font-size: 0.95rem;
       word-break: break-all;
+    }
+    .order-no { flex: 1; min-width: 0; }
+    .paid-tag {
+      flex-shrink: 0;
+      font-size: 0.75rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      background: rgba(0,255,136,0.2);
+      color: #00ff88;
+      font-family: "Microsoft YaHei", sans-serif;
+    }
+    .order-link.clicked .paid-tag {
+      background: rgba(90,106,122,0.25);
+      color: #8892b0;
     }
     .panel-niuniu .order-link {
       color: #ffb347;
@@ -209,7 +226,7 @@
         <p class="hint">叨叨商城 hnlsxxkj.com · 数量为 N 连续购买 N 次</p>
       </div>
       <div class="card">
-        <label>获取到的订单号（点击跳转支付，已点击变灰）</label>
+        <label>获取到的订单号（点击跳转支付，已点击显示「已支付」）</label>
         <div class="order-list" data-order-list><span class="order-empty">暂无订单</span></div>
         <label style="margin-top:1rem">运行日志</label>
         <div class="log-box" data-log-box>等待操作…</div>
@@ -254,7 +271,7 @@
         <p class="hint">牛牛商城 whquxinyong.xyz · 数量为 N 连续购买 N 次</p>
       </div>
       <div class="card">
-        <label>获取到的订单号（点击跳转支付，已点击变灰）</label>
+        <label>获取到的订单号（点击跳转支付，已点击显示「已支付」）</label>
         <div class="order-list" data-order-list><span class="order-empty">暂无订单</span></div>
         <label style="margin-top:1rem">运行日志</label>
         <div class="log-box" data-log-box>等待操作…</div>
@@ -368,6 +385,7 @@
 
     function collectOrders(data, shop) {
       const list = [];
+      if (!data.ok) return list;
       const seen = new Set();
       const add = (orderNumber, paymentUrl) => {
         if (!orderNumber || seen.has(orderNumber)) return;
@@ -378,7 +396,8 @@
       if (data.orderNumber) add(data.orderNumber, data.paymentUrl);
       (data.logs || []).forEach((item) => {
         const m = item.message || '';
-        const match = m.match(/订单号[：:]\s*(qb\w+)/i);
+        const match = m.match(/第\s*\d+\s*个订单号[：:]\s*(qb\w+)/i)
+          || m.match(/订单号[：:]\s*(qb\w+)/i);
         if (match) add(match[1]);
       });
       return list;
@@ -404,6 +423,26 @@
       }
     }
 
+    function formatOrderLabel(index, orderNumber) {
+      const num = String(orderNumber).replace(/^qb/i, '');
+      return `订单${index}：${num}`;
+    }
+
+    function setOrderLinkPaid(link, displayIndex, orderNumber, isPaid) {
+      link.innerHTML = '';
+      const noSpan = document.createElement('span');
+      noSpan.className = 'order-no';
+      noSpan.textContent = formatOrderLabel(displayIndex, orderNumber);
+      link.appendChild(noSpan);
+      if (isPaid) {
+        link.classList.add('clicked');
+        const tag = document.createElement('span');
+        tag.className = 'paid-tag';
+        tag.textContent = '已支付';
+        link.appendChild(tag);
+      }
+    }
+
     function renderOrders(orderList, orders, shop) {
       const clicked = getClickedOrders(shop);
       orderList.innerHTML = '';
@@ -411,15 +450,15 @@
         orderList.innerHTML = '<span class="order-empty">暂无订单</span>';
         return;
       }
-      orders.forEach((o) => {
+      orders.forEach((o, idx) => {
         const link = document.createElement('a');
         link.className = 'order-link';
-        if (clicked.includes(o.orderNumber)) link.classList.add('clicked');
+        const isPaid = clicked.includes(o.orderNumber);
         link.href = o.paymentUrl;
-        link.textContent = o.orderNumber;
+        setOrderLinkPaid(link, idx + 1, o.orderNumber, isPaid);
         link.addEventListener('click', () => {
           markOrderClicked(shop, o.orderNumber);
-          link.classList.add('clicked');
+          setOrderLinkPaid(link, idx + 1, o.orderNumber, true);
         });
         orderList.appendChild(link);
       });
@@ -569,11 +608,11 @@
 
         buyBtn.disabled = true;
         logBox.innerHTML = '';
-        clearOrderList(orderList);
+        orderList.innerHTML = '<span class="order-empty">购买中，全部完成后再显示订单…</span>';
         appendLog(logBox, `开始购买，将连续下单 ${quantity} 次…`);
 
         const allOrders = [];
-        let hasError = false;
+        let failCount = 0;
 
         try {
           for (let i = 1; i <= quantity; i++) {
@@ -593,25 +632,30 @@
               appendLog(logBox, m, cls);
             });
 
-            collectOrders(data, shop).forEach((o) => {
-              if (!allOrders.some((x) => x.orderNumber === o.orderNumber)) {
-                allOrders.push(o);
-              }
-            });
-
-            if (!data.ok) {
-              hasError = true;
-              appendLog(logBox, data.message || `第 ${i} 次失败`, 'error');
-              break;
+            if (data.ok) {
+              collectOrders(data, shop).forEach((o) => {
+                if (!allOrders.some((x) => x.orderNumber === o.orderNumber)) {
+                  allOrders.push(o);
+                }
+              });
+            } else {
+              failCount += 1;
+              appendLog(logBox, data.message || `第 ${i} 次购买失败（已跳过）`, 'error');
             }
+
             if (i < quantity) await sleep(800);
           }
 
           if (allOrders.length) {
             renderOrders(orderList, allOrders, shop);
-            appendLog(logBox, `共 ${allOrders.length} 个订单，点击订单号跳转支付`, 'success');
-          } else if (!hasError) {
-            orderList.innerHTML = '<span class="order-empty">未解析到订单号</span>';
+            appendLog(
+              logBox,
+              `完成：成功 ${allOrders.length} 个${failCount ? `，失败 ${failCount} 个（失败不显示）` : ''}，点击订单号跳转支付`,
+              'success'
+            );
+          } else {
+            orderList.innerHTML = '<span class="order-empty">暂无成功订单</span>';
+            if (failCount) appendLog(logBox, `全部失败，共 ${failCount} 次`, 'error');
           }
         } catch (e) {
           appendLog(logBox, `网络错误: ${e.message}`, 'error');
